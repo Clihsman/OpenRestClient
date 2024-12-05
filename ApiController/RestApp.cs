@@ -15,14 +15,16 @@ namespace OpenRestController
         private Dictionary<string, Dictionary<int, MethodArgs>> Methods { get; set; }
         private Dictionary<string, string> Headers { get; set; }
 
-        protected RestApp(string host, Type type) {
+        protected RestApp(string host, Type type)
+        {
             Host = host;
             Headers = new Dictionary<string, string>();
             Methods = new Dictionary<string, Dictionary<int, MethodArgs>>();
             AddUrls(this, GetRoute(type), type);
         }
 
-        protected RestApp(Type type) {
+        protected RestApp(Type type)
+        {
             Host = GetHost(type);
             Headers = new Dictionary<string, string>();
             Methods = new Dictionary<string, Dictionary<int, MethodArgs>>();
@@ -37,7 +39,7 @@ namespace OpenRestController
                 foreach (var header in Headers)
                     client.DefaultRequestHeaders.Add(header.Key, header.Value);
 
-                if (methodType == "get") 
+                if (methodType == "get")
                 {
                     HttpResponseMessage response = await client.GetAsync(url);
                     return await response.Content.ReadAsStringAsync();
@@ -72,8 +74,8 @@ namespace OpenRestController
             Console.WriteLine(url);
             using (HttpClient client = new())
             {
-                foreach(var header in Headers)
-                   client.DefaultRequestHeaders.Add(header.Key, header.Value);
+                foreach (var header in Headers)
+                    client.DefaultRequestHeaders.Add(header.Key, header.Value);
 
                 if (methodType == "get")
                 {
@@ -107,8 +109,8 @@ namespace OpenRestController
 
             using (HttpClient client = new())
             {
-                foreach(var header in Headers)
-                   client.DefaultRequestHeaders.Add(header.Key, header.Value);
+                foreach (var header in Headers)
+                    client.DefaultRequestHeaders.Add(header.Key, header.Value);
 
                 if (methodType == "get")
                 {
@@ -144,22 +146,27 @@ namespace OpenRestController
             return default;
         }
 
-        public void AddHeader(string name, string value) { 
-           Headers.Add(name, value);
+        public void AddHeader(string name, string value)
+        {
+            Headers.Add(name, value);
         }
 
-        private (string, string) GetUrl(string method, params object[] args) {
-            method += args.Length;   
+        private (string, string) GetUrl(string method, params object[] args)
+        {
+            method += args.Length;
             MethodArgs methodArgs = Methods[method][args.Length];
-            args = GetArgs(methodArgs,  args);
+            args = GetArgs(methodArgs, args);
             string url = string.Format("{0}/{1}", Host, methodArgs.Url);
             return (GetMethodName(methodArgs.MethodType), string.Format(url, args));
         }
 
-        private static object[] GetArgs(MethodArgs method, object[] args) {
-            for (int i = 0; i < method.InFields.Count; i++) {
-          
-                if (method.InFields[i] is InJoin) {
+        private static object[] GetArgs(MethodArgs method, object[] args)
+        {
+            for (int i = 0; i < method.InFields.Count; i++)
+            {
+
+                if (method.InFields[i] is InJoin)
+                {
                     if (!args[i].GetType().IsArray) throw new ArgumentException();
 
                     InJoin? inJoin = method.InFields[i] as InJoin;
@@ -174,8 +181,9 @@ namespace OpenRestController
             return args;
         }
 
-        private static string? GetHost(Type type) {
-           return Assembly.GetAssembly(type)?.GetCustomAttribute<RestHost>()?.Host;
+        private static string? GetHost(Type type)
+        {
+            return Assembly.GetAssembly(type)?.GetCustomAttribute<RestHost>()?.Host;
         }
 
         private static string GetMethodName(MethodType methodType)
@@ -202,35 +210,43 @@ namespace OpenRestController
             return app;
         }
 
-        private static void AddUrls(RestApp app, string? route, Type type) {
+        private static void AddUrls(RestApp app, string? route, Type type)
+        {
             foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
             {
                 string methodName = method.Name;
-                MethodArgs url = new MethodArgs();
-                ParameterInfo[]? parameters = method.GetParameters();
-                Dictionary<int, MethodArgs> urls = new Dictionary<int, MethodArgs>();
+                MethodArgs url = new();
+                ParameterInfo[] parameters = method.GetParameters();
+
+                Dictionary<int, MethodArgs> urls = new();
                 url.InFields = new List<InField>();
                 RestMethod? restMethod = method.GetCustomAttribute<RestMethod>();
+
+                if (restMethod is null) continue;
+
                 url.Url = route;
-                int index = restMethod?.Method == MethodType.POST || restMethod?.Method == MethodType.PUT ? 1 : 0;
+                //int index = restMethod?.Method == MethodType.POST || restMethod?.Method == MethodType.PUT ? 1 : 0;
 
-                if (restMethod != null)
-                {
-                    url.MethodType = restMethod.Method;
-                }
 
-                for (int i = index; i < parameters?.Length; i++)
+                url.MethodType = restMethod!.Method;
+                url.Url = $"{url.Url}/{restMethod.Route}";
+
+                for (int i = 0; i < parameters.Length; i++)
                 {
-                    url.Url = string.Format("{0}/{1}", url.Url, "{" + i + "}");
                     InField? inField = parameters[i].GetCustomAttribute<InField>();
-                    if (inField != null) url.InFields.Add(inField);
+                    if (inField is not null)
+                    {
+                        url.Url = $"{url.Url}/{{{i}}}";
+                        url.InFields.Add(inField);
+                    }         
                 }
-                app?.Methods.Add(methodName + parameters?.Length, urls);
-                urls?.Add(parameters.Length, url);
+                app?.Methods.Add(methodName + parameters.Length, urls);
+                urls.Add(parameters.Length, url);
             }
         }
 
-        private static string? GetRoute(Type type) { 
+        private static string? GetRoute(Type type)
+        {
             return type.GetCustomAttribute<RestController>()?.Route;
         }
 
