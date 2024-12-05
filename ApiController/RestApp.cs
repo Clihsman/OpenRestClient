@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OpenRestClient;
+using OpenRestClient.ApiController.Exceptions;
 using OpenRestClient.Attributes;
 using OpenRestController.Attributes;
 using OpenRestController.Enums;
@@ -88,7 +89,6 @@ namespace OpenRestController
         protected async Task<T[]?> CallArray<T>(string method, params object[] args)
         {
             (MethodArgs methodArgs, string url) = GetUrl(method, args);
-            Console.WriteLine(url);
             using HttpClient client = new();
 
             foreach (var header in Headers)
@@ -98,6 +98,10 @@ namespace OpenRestController
             {
                 HttpResponseMessage response = await client.GetAsync(url);
                 string json = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, json);
+
                 return JsonConvert.DeserializeObject<T[]>(json);
             }
             if (methodArgs.MethodType == MethodType.POST)
@@ -105,6 +109,10 @@ namespace OpenRestController
                 string json = JsonConvert.SerializeObject(args[0]);
                 var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
                 HttpResponseMessage response = await client.PostAsync(url, httpContent);
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, json);
+
                 return JsonConvert.DeserializeObject<T[]>(await response.Content.ReadAsStringAsync());
             }
 
@@ -114,9 +122,14 @@ namespace OpenRestController
                 var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
                 HttpResponseMessage response = await client.PutAsync(url, httpContent);
                 json = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<T[]>(await response.Content.ReadAsStringAsync());
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, json);
+
+                return JsonConvert.DeserializeObject<T[]>(json);
             }
-            return null;
+
+            throw new Exception();
         }
 
         protected async Task<T?> Call<T>(string method, params object[] args)
@@ -124,6 +137,8 @@ namespace OpenRestController
             LoadVariables();
 
             (MethodArgs methodArgs, string url) = GetUrl(method, args);
+
+            Console.WriteLine(url);
 
             using HttpClient client = new();
 
@@ -134,6 +149,10 @@ namespace OpenRestController
             {
                 HttpResponseMessage response = await client.GetAsync(url);
                 string json = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, json);
+
                 return JsonConvert.DeserializeObject<T>(json);
             }
 
@@ -150,11 +169,13 @@ namespace OpenRestController
 
                 RestAuthentication? restAuthentication = methodArgs.MethodInfo.GetCustomAttribute<RestAuthentication>();
      
-
-                if (restAuthentication is not null && response.StatusCode == HttpStatusCode.OK) {
+                if (restAuthentication is not null && response.IsSuccessStatusCode) {
                     LoadRestAuthentication(restAuthentication, json);
                 }
-              
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, json);
+
                 return JsonConvert.DeserializeObject<T>(json);
             }
 
@@ -164,6 +185,10 @@ namespace OpenRestController
                 var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
                 HttpResponseMessage response = await client.PutAsync(url, httpContent);
                 json = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, json);
+
                 return JsonConvert.DeserializeObject<T>(json);
             }
 
@@ -171,10 +196,148 @@ namespace OpenRestController
             {
                 HttpResponseMessage response = await client.DeleteAsync(url);
                 string json = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, json);
+
                 return JsonConvert.DeserializeObject<T>(json);
             }
 
-            return default;
+            throw new Exception();
+        }
+
+        protected async Task<RestResponse<T?>> CallResponse<T>(string method, params object[] args)
+        {
+            LoadVariables();
+
+            (MethodArgs methodArgs, string url) = GetUrl(method, args);
+
+            using HttpClient client = new();
+
+            foreach (var header in Headers)
+                client.DefaultRequestHeaders.Add(header.Key, header.Value);
+
+            if (methodArgs.MethodType == MethodType.GET)
+            {
+                HttpResponseMessage response = await client.GetAsync(url);
+                string json = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode) { 
+                    T? value = JsonConvert.DeserializeObject<T>(json);
+                    return new RestResponse<T?>(value, response);
+                }
+
+                return new RestResponse<T?>(response);
+            }
+
+            if (methodArgs.MethodType == MethodType.POST)
+            {
+                string json = methodArgs.ContainsBody ?
+                    JsonConvert.SerializeObject(args[methodArgs.BodyIndex]) : string.Empty;
+
+                HttpContent? httpContent = methodArgs.ContainsBody ?
+                    new StringContent(json, Encoding.UTF8, "application/json") : null;
+
+                HttpResponseMessage response = await client.PostAsync(url, httpContent);
+                json = await response.Content.ReadAsStringAsync();
+
+                RestAuthentication? restAuthentication = methodArgs.MethodInfo.GetCustomAttribute<RestAuthentication>();
+
+                if (restAuthentication is not null && response.IsSuccessStatusCode)
+                {
+                    LoadRestAuthentication(restAuthentication, json);
+                }
+
+                if (response.IsSuccessStatusCode)
+                {
+                    T? value = JsonConvert.DeserializeObject<T>(json);
+                    return new RestResponse<T?>(value, response);
+                }
+
+                return new RestResponse<T?>(response);
+            }
+
+            if (methodArgs.MethodType == MethodType.PUT)
+            {
+                string json = JsonConvert.SerializeObject(args[0]);
+                var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
+                HttpResponseMessage response = await client.PutAsync(url, httpContent);
+                json = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    T? value = JsonConvert.DeserializeObject<T>(json);
+                    return new RestResponse<T?>(value, response);
+                }
+
+                return new RestResponse<T?>(response);
+            }
+
+            if (methodArgs.MethodType == MethodType.DELETE)
+            {
+                HttpResponseMessage response = await client.DeleteAsync(url);
+                string json = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    T? value = JsonConvert.DeserializeObject<T>(json);
+                    return new RestResponse<T?>(value, response);
+                }
+
+                return new RestResponse<T?>(response);
+            }
+
+            throw new Exception();
+        }
+
+        protected async Task Call(string method, params object[] args)
+        {
+            LoadVariables();
+
+            (MethodArgs methodArgs, string url) = GetUrl(method, args);
+
+            using HttpClient client = new();
+            
+            foreach (var header in Headers)
+                client.DefaultRequestHeaders.Add(header.Key, header.Value);
+
+            if (methodArgs.MethodType == MethodType.GET)
+            {
+                HttpResponseMessage response = await client.GetAsync(url);
+                string json = await response.Content.ReadAsStringAsync();
+            }
+
+            if (methodArgs.MethodType == MethodType.POST)
+            {
+                string json = methodArgs.ContainsBody ?
+                    JsonConvert.SerializeObject(args[methodArgs.BodyIndex]) : string.Empty;
+
+                HttpContent? httpContent = methodArgs.ContainsBody ?
+                    new StringContent(json, Encoding.UTF8, "application/json") : null;
+
+                HttpResponseMessage response = await client.PostAsync(url, httpContent);
+                json = await response.Content.ReadAsStringAsync();
+
+                RestAuthentication? restAuthentication = methodArgs.MethodInfo.GetCustomAttribute<RestAuthentication>();
+
+                if (restAuthentication is not null && response.StatusCode == HttpStatusCode.OK)
+                {
+                    LoadRestAuthentication(restAuthentication, json);
+                }
+            }
+
+            if (methodArgs.MethodType == MethodType.PUT)
+            {
+                string json = JsonConvert.SerializeObject(args[0]);
+                var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
+                HttpResponseMessage response = await client.PutAsync(url, httpContent);
+            }
+
+            if (methodArgs.MethodType == MethodType.DELETE)
+            {
+                HttpResponseMessage response = await client.DeleteAsync(url);
+                string json = await response.Content.ReadAsStringAsync();
+            }
         }
 
         public void AddHeader(string name, string value)
@@ -254,12 +417,10 @@ namespace OpenRestController
 
                 if (restMethod is null) continue;
 
-                url.Url = route;
+                url.Url = string.Join("/", new[] { route ?? "", restMethod.Route ?? "" }.Where(e => !string.IsNullOrWhiteSpace(e)));
                 url.MethodInfo = method;
-                //int index = restMethod?.Method == MethodType.POST || restMethod?.Method == MethodType.PUT ? 1 : 0;
-
+                
                 url.MethodType = restMethod!.Method;
-                url.Url = restMethod.Route is null ? url.Url : $"{url.Url}/{restMethod.Route}";
                 int parametersCount = 0;
 
                 for (int i = 0; i < parameters.Length; i++)
@@ -267,17 +428,19 @@ namespace OpenRestController
                     InField? inField = parameters[i].GetCustomAttribute<InField>();
                     if (inField is not null)
                     {
+                        parametersCount++;
                         if (inField is InBody)
                         {
                             if (url.ContainsBody) throw new ArgumentException("The method cannot have more than one body.");
 
                             url.BodyIndex = i;
                             url.ContainsBody = true;
+                            continue;
                         }
 
                         url.Url = $"{url.Url}/{{{i}}}";
                         url.InFields.Add(inField);
-                        parametersCount++;
+                     
                     }
                 }
 

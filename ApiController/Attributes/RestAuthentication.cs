@@ -1,6 +1,7 @@
 ﻿namespace OpenRestClient.Attributes
 {
-    public abstract class RestAuthentication : Attribute
+    [AttributeUsage(AttributeTargets.Method)]
+    public class RestAuthentication : Attribute
     {
         public AuthenticationType AuthenticationType { get; private set; }
         public AuthenticationMode AuthenticationMode { get; private set; }

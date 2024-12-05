@@ -3,7 +3,7 @@
 namespace OpenRestController.Attributes
 {
     [AttributeUsage(AttributeTargets.Method)]
-    public sealed class RestMethod : Attribute
+    public class RestMethod : Attribute
     {
         public string? Route { get; private set; }
         public MethodType Method { get; private set; }
