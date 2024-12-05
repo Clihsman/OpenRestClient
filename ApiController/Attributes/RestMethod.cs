@@ -1,5 +1,4 @@
 ﻿using OpenRestController.Enums;
-using System;
 
 namespace OpenRestController.Attributes
 {

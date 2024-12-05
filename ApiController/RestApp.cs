@@ -1,4 +1,6 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using OpenRestClient;
 using OpenRestClient.Attributes;
 using OpenRestController.Attributes;
 using OpenRestController.Enums;
@@ -15,12 +17,15 @@ namespace OpenRestController
         private Dictionary<string, Dictionary<int, MethodArgs>> Methods { get; set; }
         private Dictionary<string, string> Headers { get; set; }
 
+        internal static Dictionary<string, string> Env = new();
+
         protected RestApp(string host, Type type)
         {
             Host = host;
             Headers = new Dictionary<string, string>();
             Methods = new Dictionary<string, Dictionary<int, MethodArgs>>();
             AddUrls(this, GetRoute(type), type);
+            LoadVariables();
         }
 
         protected RestApp(Type type)
@@ -29,6 +34,17 @@ namespace OpenRestController
             Headers = new Dictionary<string, string>();
             Methods = new Dictionary<string, Dictionary<int, MethodArgs>>();
             AddUrls(this, GetRoute(type), type);
+            LoadVariables();
+        }
+
+        private void LoadVariables() {
+            string? host = Environment.GetEnvironmentVariable("opendev.openrestclient.host");
+            if (host is not null)
+                Host = host;
+
+            string? token = Env.GetValueOrDefault("opendev.openrestclient.jwt.bearer.token");
+            if (token is not null)
+                AddHeader("Authorization", $"Bearer {token}");
         }
 
         protected async Task<string?> CallString(string method, params object[] args)
@@ -44,6 +60,7 @@ namespace OpenRestController
                 HttpResponseMessage response = await client.GetAsync(url);
                 return await response.Content.ReadAsStringAsync();
             }
+
             if (methodArgs.MethodType == MethodType.POST)
             {
                 string json = JsonConvert.SerializeObject(args[0]);
@@ -59,6 +76,7 @@ namespace OpenRestController
                 HttpResponseMessage response = await client.PutAsync(url, httpContent);
                 return await response.Content.ReadAsStringAsync();
             }
+
             if (methodArgs.MethodType == MethodType.DELETE)
             {
                 HttpResponseMessage response = await client.DeleteAsync(url);
@@ -103,6 +121,8 @@ namespace OpenRestController
 
         protected async Task<T?> Call<T>(string method, params object[] args)
         {
+            LoadVariables();
+
             (MethodArgs methodArgs, string url) = GetUrl(method, args);
 
             using HttpClient client = new();
@@ -116,9 +136,10 @@ namespace OpenRestController
                 string json = await response.Content.ReadAsStringAsync();
                 return JsonConvert.DeserializeObject<T>(json);
             }
+
             if (methodArgs.MethodType == MethodType.POST)
             {
-                string json = methodArgs.ContainsBody ? 
+                string json = methodArgs.ContainsBody ?
                     JsonConvert.SerializeObject(args[methodArgs.BodyIndex]) : string.Empty;
 
                 HttpContent? httpContent = methodArgs.ContainsBody ?
@@ -126,6 +147,14 @@ namespace OpenRestController
 
                 HttpResponseMessage response = await client.PostAsync(url, httpContent);
                 json = await response.Content.ReadAsStringAsync();
+
+                RestAuthentication? restAuthentication = methodArgs.MethodInfo.GetCustomAttribute<RestAuthentication>();
+     
+
+                if (restAuthentication is not null && response.StatusCode == HttpStatusCode.OK) {
+                    LoadRestAuthentication(restAuthentication, json);
+                }
+              
                 return JsonConvert.DeserializeObject<T>(json);
             }
 
@@ -150,7 +179,17 @@ namespace OpenRestController
 
         public void AddHeader(string name, string value)
         {
-            Headers.Add(name, value);
+            Headers.AddOrSet(name, value);
+        }
+
+        private static void LoadRestAuthentication(RestAuthentication restAuthentication, string json) { 
+            JObject body = JObject.Parse(json);
+
+            if (restAuthentication.AuthenticationType == AuthenticationType.JWT && restAuthentication.AuthenticationMode == AuthenticationMode.BEARER) {
+               string? token = body.SelectToken(restAuthentication.ObjectPath)?.Value<string>();
+                if (token is not null)
+                    Env.AddOrSet("opendev.openrestclient.jwt.bearer.token", token);
+            }
         }
 
         private (MethodArgs, string) GetUrl(string method, params object[] args)
@@ -190,7 +229,7 @@ namespace OpenRestController
 
         public static T GetRestApp<T>(string host) where T : RestApp, new()
         {
-            T app = new T
+            T app = new()
             {
                 Host = host,
                 Methods = new Dictionary<string, Dictionary<int, MethodArgs>>()
@@ -198,7 +237,6 @@ namespace OpenRestController
 
             Type type = typeof(T);
             AddUrls(app, GetRoute(type), typeof(T));
-
             return app;
         }
 
@@ -217,6 +255,7 @@ namespace OpenRestController
                 if (restMethod is null) continue;
 
                 url.Url = route;
+                url.MethodInfo = method;
                 //int index = restMethod?.Method == MethodType.POST || restMethod?.Method == MethodType.PUT ? 1 : 0;
 
                 url.MethodType = restMethod!.Method;
@@ -258,6 +297,8 @@ namespace OpenRestController
             public bool ContainsBody { get; set; }
             public int BodyIndex { get; set; }
             public MethodType MethodType { get; set; }
+
+            public MethodInfo MethodInfo { get; set; }  
 
             public List<InField> InFields { get; set; }
         }
