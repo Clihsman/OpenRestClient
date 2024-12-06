@@ -1,5 +1,4 @@
-﻿using OpenRestController.Attributes;
-using OpenRestController.Enums;
+﻿using OpenRestController.Enums;
 
 namespace OpenRestClient.Attributes
 {

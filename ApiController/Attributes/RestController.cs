@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace OpenRestController.Attributes
+﻿namespace OpenRestClient.Attributes
 {
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
     public sealed class RestController : Attribute

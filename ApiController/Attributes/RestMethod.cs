@@ -1,6 +1,6 @@
 ﻿using OpenRestController.Enums;
 
-namespace OpenRestController.Attributes
+namespace OpenRestClient.Attributes
 {
     [AttributeUsage(AttributeTargets.Method)]
     public class RestMethod : Attribute

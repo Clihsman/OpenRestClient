@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace OpenRestController.Attributes
+﻿namespace OpenRestClient.Attributes
 {
     [AttributeUsage(AttributeTargets.Assembly, Inherited = false)]
     public class RestHost : Attribute
