@@ -2,6 +2,6 @@
 {
     public enum MethodType
     {
-        GET, POST, PUT, DELETE, OPTIONS, NULL
+        GET, POST, PUT, PATCH, DELETE, OPTIONS
     }
 }

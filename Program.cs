@@ -1,12 +1,5 @@
-﻿using OpenRestClient.Attributes;
-using OpenRestController;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Dynamic;
-using System.Reflection;
+﻿/*
+using OpenRestClient.Attributes;
 using OpenRestClient.ApiController.Exceptions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -14,31 +7,6 @@ using Newtonsoft.Json.Serialization;
 namespace OpenRestClient
 {
 
-    /*
-    public record UserRequest(string Token, int UserId);
-
-    [RestController("auth")]
-    public class LoginService : RestApp
-    {
-        public LoginService() : base(typeof(LoginService)) { }
-
-        [PostMapping("signin/pepito/juan")]
-        [RestAuthentication(AuthenticationType.JWT, AuthenticationMode.BEARER, "token")]
-        public Task<UserRequest?> Signin([InBody] string email, string password)
-            => Call<UserRequest>(nameof(Signin), new { email, password });
-    }
-
-    */
-    /*
-    [RestController("auth")]
-
-    public record UserRequest(string Token, int UserId);
-
-    [PostMapping("signin")]
-    [RestAuthentication(AuthenticationType.JWT, AuthenticationMode.BEARER, "token")]
-    */
-
-    // public record User([JsonProperty("email")] string email, [JsonProperty("password")] string password);
 
     public class User
     {
@@ -62,6 +30,17 @@ namespace OpenRestClient
         Task Signin([InBody] User user);
     }
 
+    [RestController("auth")]
+    public class LoginService : RestApp
+    {
+        public LoginService() : base(typeof(LoginService)) { }
+
+        [PostMapping("signin")]
+        [RestAuthentication(AuthenticationType.JWT, AuthenticationMode.BEARER, "token")]
+        public Task Signin([InBody] User user)
+            => Call(nameof(Signin), user);
+    }
+
     [RestController("whatsapp/contacts")]
     public class ContactService : RestApp
     {
@@ -75,6 +54,7 @@ namespace OpenRestClient
     class Program
     {
         private readonly static ILoginService loginService = RestApp.BuildApp<ILoginService>();
+        private readonly static LoginService loginService2 = new();
         private readonly static ContactService contactsService = new();
 
         public static async Task Main()
@@ -82,9 +62,12 @@ namespace OpenRestClient
             Environment.SetEnvironmentVariable("opendev.openrestclient.host", "https://huemchatbot.com:442/api");
             try
             {
-                await loginService.Signin(new User {Email="clihsman.cs@gmail.com", Password="cs14503034" });
-                Contact[]? result = await contactsService.GetContacts();
-                Console.WriteLine(result.Length);
+
+
+                await loginService2.Signin(new User {Email="clihsman.cs@gmail.com", Password="cs14503034" });
+
+             //   Contact[]? result = await contactsService.GetContacts();
+              //  Console.WriteLine(result!.Length);
 
             }
             catch (RestException ex)
@@ -96,3 +79,4 @@ namespace OpenRestClient
       
     }
 }
+*/
