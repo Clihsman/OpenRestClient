@@ -22,13 +22,17 @@ namespace OpenRestClient
         public string? Name;
     }
 
+
     [RestController("auth")]
     public interface ILoginService
     {
         [PostMapping("signin")]
         [RestAuthentication(AuthenticationType.JWT, AuthenticationMode.BEARER, "token")]
-        Task Signin([InBody] User user);
+        Task Authenticate([InBody] User user);
+
+        static ILoginService Build() => RestApp.BuildApp<ILoginService>();
     }
+
 
     [RestController("auth")]
     public class LoginService : RestApp
@@ -41,39 +45,68 @@ namespace OpenRestClient
             => Call(nameof(Signin), user);
     }
 
-    [RestController("whatsapp/contacts")]
-    public class ContactService : RestApp
+    public class Specialty
     {
-        public ContactService() : base(typeof(ContactService)) { }
+        [JsonProperty("id")]
+        public int Id { get; set; }
 
-        [GetMapping]
-        public Task<Contact[]?> GetContacts()
-            => Call<Contact[]>(nameof(GetContacts));
+        [JsonProperty("name")]
+        public string Name { get; set; }
     }
+
+
+    [RestController("parameters")]
+    public class ParametersService : RestApp
+    {
+        public ParametersService() : base(typeof(ParametersService)) { }
+
+        [GetMapping("specialties")]
+        public Task<List<Specialty>?> GetSpecialties()
+            => Call<List<Specialty>>(nameof(GetSpecialties));
+    }
+
+    public class FileFDD
+    {
+        [JsonProperty("id")]
+        public int Id { get; set; }
+    }
+
+    [RestController("upload")]
+    public class UploadFileService : RestApp
+    {
+        public UploadFileService() : base(typeof(UploadFileService)) { }
+
+        [PostMapping]
+        public Task<FileFDD?> UploadFile([InField] string abc, [InQuery] string name, [InQuery] int document)
+            => Call<FileFDD>(nameof(UploadFile), abc, name, document);
+    }
+
 
     class Program
     {
         private readonly static ILoginService loginService = RestApp.BuildApp<ILoginService>();
         private readonly static LoginService loginService2 = new();
-        private readonly static ContactService contactsService = new();
+        private readonly static ParametersService contactsService = new();
+        private readonly static UploadFileService uploadFileService = new();
 
         public static async Task Main()
         {
-            Environment.SetEnvironmentVariable("opendev.openrestclient.host", "https://huemchatbot.com:442/api");
+            Environment.SetEnvironmentVariable("opendev.openrestclient.host", "http://localhost:3000/api");
+            Environment.SetEnvironmentVariable("opendev.openrestclient.debug", "true");
             try
             {
+               
+              //  await loginService.Authenticate(new User {Email="clihsman.cs@gmail.com", Password= "cs14503034" });
+                FileFDD? fileFDD = await uploadFileService.UploadFile("abc", "isaac", 6236529);
 
-
-                await loginService2.Signin(new User {Email="clihsman.cs@gmail.com", Password="cs14503034" });
-
-             //   Contact[]? result = await contactsService.GetContacts();
-              //  Console.WriteLine(result!.Length);
+                Console.WriteLine(fileFDD?.Id);
 
             }
             catch (RestException ex)
             {
                 Console.WriteLine("{0}: {1}", ex.HttpStatusCode, ex.Message);
             }
+            Console.ReadKey();
         }
 
       

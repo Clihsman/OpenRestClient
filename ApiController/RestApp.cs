@@ -1,10 +1,17 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using OpenRestClient.ApiController.Attributes;
 using OpenRestClient.ApiController.Exceptions;
 using OpenRestClient.Attributes;
 using OpenRestController.Enums;
+using System.Collections.Specialized;
+using System.Diagnostics.SymbolStore;
+using System.IO;
+using System.Net.Http;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
+using System.Web;
 
 namespace OpenRestClient
 {
@@ -13,6 +20,7 @@ namespace OpenRestClient
         private string? Host { get; set; }
         private Dictionary<string, Dictionary<int, MethodArgs>> Methods { get; set; }
         private Dictionary<string, string> Headers { get; set; }
+        private bool DebugMode { get; set; }
 
         internal static Dictionary<string, string> Env = new();
 
@@ -43,6 +51,10 @@ namespace OpenRestClient
             string? token = Env.GetValueOrDefault("opendev.openrestclient.jwt.bearer.token");
             if (token is not null)
                 AddHeader("Authorization", $"Bearer {token}");
+
+            string? debugmode = Environment.GetEnvironmentVariable("opendev.openrestclient.debug");
+            if (debugmode == "true")
+                DebugMode = true;
         }
 
         protected async Task<string?> CallString(string method, params object[] args)
@@ -62,9 +74,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
+
 
                 return dataResponse;
             }
@@ -81,9 +93,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
 
                 return dataResponse;
             }
@@ -100,9 +112,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequerst, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequerst, dataResponse);
+
 
                 return dataResponse;
             }
@@ -118,9 +130,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
 
                 return dataResponse;
             }
@@ -134,73 +146,13 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataResponse, string.Empty);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataResponse, string.Empty);
+
 
                 return await response.Content.ReadAsStringAsync();
             }
             return null;
-        }
-
-        protected async Task<T[]?> CallArray<T>(string method, params object[] args)
-        {
-            (MethodArgs methodArgs, string url) = GetUrl(method, args);
-            using HttpClient client = new();
-
-            foreach (var header in Headers)
-                client.DefaultRequestHeaders.Add(header.Key, header.Value);
-
-            if (methodArgs.MethodType == MethodType.GET)
-            {
-                HttpResponseMessage response = await client.GetAsync(url);
-                string dataResponse = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                    throw new RestException(response.StatusCode, dataResponse);
-
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataResponse, string.Empty);
-#endif
-
-                return JsonConvert.DeserializeObject<T[]>(dataResponse);
-            }
-
-            if (methodArgs.MethodType == MethodType.POST)
-            {
-                string dataRequest = JsonConvert.SerializeObject(args[0]);
-                var httpContent = new StringContent(dataRequest, Encoding.UTF8, "application/json");
-                HttpResponseMessage response = await client.PostAsync(url, httpContent);
-
-
-                if (!response.IsSuccessStatusCode)
-                    throw new RestException(response.StatusCode, dataRequest);
-
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, string.Empty);
-#endif
-
-                return JsonConvert.DeserializeObject<T[]>(await response.Content.ReadAsStringAsync());
-            }
-
-            if (methodArgs.MethodType == MethodType.PUT)
-            {
-                string dataResponse = JsonConvert.SerializeObject(args[0]);
-                var httpContent = new StringContent(dataResponse, Encoding.UTF8, "application/json");
-                HttpResponseMessage response = await client.PutAsync(url, httpContent);
-                string dataRequest = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                    throw new RestException(response.StatusCode, dataResponse);
-
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
-
-                return JsonConvert.DeserializeObject<T[]>(dataResponse);
-            }
-
-            throw new Exception();
         }
 
         protected internal async Task<T?> Call<T>(string method, params object[] args)
@@ -214,20 +166,77 @@ namespace OpenRestClient
             foreach (var header in Headers)
                 client.DefaultRequestHeaders.Add(header.Key, header.Value);
 
+            if (methodArgs.RestMethod is MultipartFormDataMapping)
+            {
+                using MultipartFormDataContent multipartForm = new();
+                FileStream? fileStream = null;
+
+                foreach (Tuple<InField, object?> field in methodArgs.InFields)
+                {
+                    if (field.Item1 is InPart)
+                    {
+                        multipartForm.Add(new StringContent((string)field.Item2!), field.Item1.Name!);
+                    }
+
+                    if (field.Item1 is InFormStream)
+                    {
+                        multipartForm.Add(new StreamContent((Stream)field.Item2!), field.Item1.Name!);
+                    }
+
+                    if (field.Item1 is InFormFile)
+                    {
+                        fileStream = new((string)field.Item2!, FileMode.Open, FileAccess.Read);
+                        multipartForm.Add(new StreamContent(fileStream), field.Item1.Name!, Path.GetFileName((string)field.Item2!));
+                    }
+                }
+
+                HttpResponseMessage response = await client.PostAsync(url, multipartForm);
+                string dataResponse = await response.Content.ReadAsStringAsync();
+                fileStream?.Close();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, dataResponse);
+
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, JsonConvert.SerializeObject(multipartForm), dataResponse);
+
+                return JsonConvert.DeserializeObject<T>(dataResponse);
+
+            }
+
+            if (methodArgs.RestMethod is FormUrlEncodedMapping)
+            {
+                FormUrlEncodedContent form = new(
+                    methodArgs.InFields.Where(e => e.Item1 is InPart).Select(e => new KeyValuePair<string, string>(e.Item1.Name!, (string)e.Item2!))
+                 );
+
+                HttpResponseMessage response = await client.PostAsync(url, form);
+                string dataResponse = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, dataResponse);
+
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, JsonConvert.SerializeObject(form), dataResponse);
+
+                return JsonConvert.DeserializeObject<T>(dataResponse);
+
+            }
+
+
             if (methodArgs.MethodType == MethodType.GET)
             {
                 HttpResponseMessage response = await client.GetAsync(url);
-                string dataRequest = await response.Content.ReadAsStringAsync();
+                string dataResponse = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
-                    throw new RestException(response.StatusCode, dataRequest);
+                    throw new RestException(response.StatusCode, dataResponse);
+
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
 
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, string.Empty);
-#endif
-
-                return JsonConvert.DeserializeObject<T>(dataRequest);
+                return JsonConvert.DeserializeObject<T>(dataResponse);
             }
 
             if (methodArgs.MethodType == MethodType.POST)
@@ -251,9 +260,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
 
                 return JsonConvert.DeserializeObject<T>(dataResponse);
             }
@@ -268,9 +277,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataRequest);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
 
                 return JsonConvert.DeserializeObject<T>(dataResponse);
             }
@@ -285,9 +294,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataRequest);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResonse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResonse);
+
 
                 return JsonConvert.DeserializeObject<T>(dataResonse);
             }
@@ -300,9 +309,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
+
 
                 return JsonConvert.DeserializeObject<T>(dataResponse);
             }
@@ -330,9 +339,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
+
 
                 return JsonConvert.DeserializeObject(dataResponse, type);
             }
@@ -352,15 +361,14 @@ namespace OpenRestClient
 
                 if (restAuthentication is not null && response.IsSuccessStatusCode)
                 {
-                    LoadRestAuthentication(restAuthentication, dataRequest);
+                    LoadRestAuthentication(restAuthentication, dataResponse);
                 }
 
                 if (!response.IsSuccessStatusCode)
-                    throw new RestException(response.StatusCode, dataRequest);
+                    throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
 
                 return JsonConvert.DeserializeObject(dataResponse, type);
             }
@@ -375,9 +383,8 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataRequest);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
 
                 return JsonConvert.DeserializeObject(dataResponse, type);
             }
@@ -392,9 +399,8 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataRequest);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
 
                 return JsonConvert.DeserializeObject(dataResponse, type);
             }
@@ -408,9 +414,8 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
 
                 return JsonConvert.DeserializeObject(dataResponse, type);
             }
@@ -440,9 +445,9 @@ namespace OpenRestClient
                     return new RestResponse<T?>(value, response);
                 }
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
+
 
                 return new RestResponse<T?>(response);
             }
@@ -471,9 +476,9 @@ namespace OpenRestClient
                     return new RestResponse<T?>(value, response);
                 }
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
 
                 return new RestResponse<T?>(response);
             }
@@ -491,9 +496,9 @@ namespace OpenRestClient
                     return new RestResponse<T?>(value, response);
                 }
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
 
                 return new RestResponse<T?>(response);
             }
@@ -511,9 +516,9 @@ namespace OpenRestClient
                     return new RestResponse<T?>(value, response);
                 }
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
 
                 return new RestResponse<T?>(response);
             }
@@ -530,9 +535,9 @@ namespace OpenRestClient
                     return new RestResponse<T?>(value, response);
                 }
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
+
 
                 return new RestResponse<T?>(response);
             }
@@ -556,9 +561,9 @@ namespace OpenRestClient
                 HttpResponseMessage response = await client.GetAsync(url);
                 string dataResponse = await response.Content.ReadAsStringAsync();
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
+
 
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
@@ -585,9 +590,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
             }
 
             if (methodArgs.MethodType == MethodType.PUT)
@@ -600,9 +605,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
             }
 
             if (methodArgs.MethodType == MethodType.PATCH)
@@ -615,9 +620,9 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
             }
 
             if (methodArgs.MethodType == MethodType.DELETE)
@@ -628,39 +633,38 @@ namespace OpenRestClient
                 if (!response.IsSuccessStatusCode)
                     throw new RestException(response.StatusCode, dataResponse);
 
-#if OPENRESTCLIENT_DEBUG
-                PrintDEBUG(methodArgs.MethodType, url, dataResponse, dataResponse);
-#endif
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataResponse, dataResponse);
+
             }
         }
 
-#if OPENRESTCLIENT_DEBUG
+        #region DEBUG
 
         private void PrintDEBUG(MethodType methodType, string ur, string jsonrequest, string jsonresponse)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.Write(methodType.ToString());
             Console.Write(" ");
-            Console.ForegroundColor = ConsoleColor.White;
+            Console.ForegroundColor = ConsoleColor.DarkCyan;
             Console.Write(ur);
             Console.WriteLine();
 
 
 
-#if OPENRESTCLIENT_DEBUG_JSON
-
             if (!string.IsNullOrEmpty(jsonrequest))
             {
+                Console.ForegroundColor = ConsoleColor.Gray;
                 Console.WriteLine($"REQUEST");
                 ParseJson(jsonrequest);
             }
 
             if (!string.IsNullOrEmpty(jsonresponse))
             {
+                Console.ForegroundColor = ConsoleColor.Gray;
                 Console.WriteLine($"RESPONSE");
                 ParseJson(jsonresponse);
             }
-#endif
 
         }
 
@@ -671,7 +675,12 @@ namespace OpenRestClient
             string? line;
             while ((line = reader.ReadLine()) != null)
             {
-                ParseLine(line);
+                try
+                {
+                    ParseLine(line);
+                }
+                catch { }
+
                 Console.WriteLine();
             }
         }
@@ -783,7 +792,7 @@ namespace OpenRestClient
             }
         }
 
-#endif
+        #endregion
 
         public void AddHeader(string name, string value)
         {
@@ -806,30 +815,52 @@ namespace OpenRestClient
         {
             method += args.Length;
             MethodArgs methodArgs = Methods[method][args.Length];
-            args = GetArgs(methodArgs, args);
+            args = GetArgs(ref methodArgs, args);
             string url = string.Format("{0}/{1}", Host, methodArgs.Url);
-            return (methodArgs, string.Format(url, args));
+
+            return (methodArgs, $"{string.Format(url, args)}?{methodArgs.Query}");
         }
 
-        private static object[] GetArgs(MethodArgs method, object[] args)
+        private static object[] GetArgs(ref MethodArgs method, object[] args)
         {
+            List<object> result = new();
+            method.Query = HttpUtility.ParseQueryString(string.Empty);
+
             for (int i = 0; i < method.InFields.Count; i++)
             {
+                Tuple<InField, object?> keyValue = method.InFields[i];
+                method.InFields[i] = new Tuple<InField, object?>(keyValue.Item1, args[i]);
 
-                if (method.InFields[i] is InJoin)
+                if (keyValue.Item1 is InQuery)
                 {
-                    if (!args[i].GetType().IsArray) throw new ArgumentException();
+                    string? data = args[i]?.ToString();
+                    if (string.IsNullOrWhiteSpace(data)) continue;
 
-                    InJoin? inJoin = method.InFields[i] as InJoin;
+                    method.Query[keyValue.Item1.Name] = args[i]?.ToString();
+                    continue;
+                }
+
+                if (keyValue.Item1 is InFormStream || keyValue.Item1 is InPart || keyValue.Item1 is InFormFile || keyValue.Item1 is InBody)
+                {
+                    continue;
+                }
+
+                if (keyValue.Item1 is InJoin)
+                {
+                    if (!keyValue.Item1!.GetType().IsArray) throw new ArgumentException();
+
+                    InJoin? inJoin = keyValue.Item1 as InJoin;
                     Array? elements = args[i] as Array;
-                    List<object> values = new List<object>();
+                    List<object> values = new();
                     for (int index = 0; index < elements?.Length; index++)
                         values.Add(elements.GetValue(index)!);
                     args[i] = string.Join(inJoin?.Separator, values);
                 }
+
+                result.Add(args[i]);
             }
 
-            return args;
+            return result.ToArray();
         }
 
         private static string? GetHost(Type type)
@@ -867,11 +898,12 @@ namespace OpenRestClient
                 ParameterInfo[] parameters = method.GetParameters();
 
                 Dictionary<int, MethodArgs> urls = new();
-                url.InFields = new List<InField>();
+                url.InFields = new();
                 RestMethod? restMethod = method.GetCustomAttribute<RestMethod>();
 
                 if (restMethod is null) continue;
 
+                url.RestMethod = restMethod;
                 url.Url = string.Join("/", new[] { route ?? "", restMethod.Route ?? "" }.Where(e => !string.IsNullOrWhiteSpace(e)));
                 url.MethodInfo = method;
 
@@ -883,6 +915,11 @@ namespace OpenRestClient
                     InField? inField = parameters[i].GetCustomAttribute<InField>();
                     if (inField is not null)
                     {
+                        if (string.IsNullOrWhiteSpace(inField.Name))
+                            inField.Name = parameters[i].Name;
+
+                        url.InFields.Add(new Tuple<InField, object?>(inField, null));
+
                         parametersCount++;
                         if (inField is InBody)
                         {
@@ -893,8 +930,12 @@ namespace OpenRestClient
                             continue;
                         }
 
+                        if (inField is InPart || inField is InFormFile || inField is InFormStream || inField is InQuery)
+                        {
+                            continue;
+                        }
+
                         url.Url = $"{url.Url}/{{{i}}}";
-                        url.InFields.Add(inField);
 
                     }
                 }
@@ -915,10 +956,12 @@ namespace OpenRestClient
             public bool ContainsBody { get; set; }
             public int BodyIndex { get; set; }
             public MethodType MethodType { get; set; }
+            public NameValueCollection Query { get; set; }
 
             public MethodInfo MethodInfo { get; set; }
+            public RestMethod RestMethod { get; set; }
 
-            public List<InField> InFields { get; set; }
+            public List<Tuple<InField, object?>> InFields { get; set; }
         }
     }
 }
