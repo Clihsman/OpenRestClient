@@ -18,4 +18,15 @@ namespace OpenRestClient
             HttpResponse = httpResponse;
         }
     }
+
+    public class RestResponse
+    {
+        public HttpResponseMessage HttpResponse { get; private set; }
+        public HttpStatusCode HttpStatusCode => HttpResponse.StatusCode;
+
+        public RestResponse(HttpResponseMessage httpResponse)
+        {
+            HttpResponse = httpResponse;
+        }
+    }
 }
