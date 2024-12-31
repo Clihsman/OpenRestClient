@@ -1,4 +1,5 @@
-﻿using OpenRestClient.Attributes;
+﻿/*
+using OpenRestClient.Attributes;
 using OpenRestController;
 using System;
 using System.Collections.Generic;
@@ -39,7 +40,7 @@ namespace OpenRestClient
     */
 
     // public record User([JsonProperty("email")] string email, [JsonProperty("password")] string password);
-
+    /*
     public class User
     {
         [JsonProperty("email")]
@@ -61,7 +62,8 @@ namespace OpenRestClient
         [RestAuthentication(AuthenticationType.JWT, AuthenticationMode.BEARER, "token")]
         Task Signin([InBody] User user);
     }
-
+    /*
+    
     [RestController("whatsapp/contacts")]
     public class ContactService : RestApp
     {
@@ -71,11 +73,21 @@ namespace OpenRestClient
         public Task<Contact[]?> GetContacts()
             => Call<Contact[]>(nameof(GetContacts));
     }
+    */
+    /*
+    [RestController("whatsapp/contacts")]
+    public interface ContactService 
+    {
+
+        [GetMapping]
+        public Task<Contact[]?> GetContacts();
+    }
 
     class Program
     {
         private readonly static ILoginService loginService = RestApp.BuildApp<ILoginService>();
-        private readonly static ContactService contactsService = new();
+       // private readonly static ContactService contactsService = new();
+        private readonly static ContactService contactsService = RestApp.BuildApp<ContactService>();
 
         public static async Task Main()
         {
@@ -84,7 +96,7 @@ namespace OpenRestClient
             {
                 await loginService.Signin(new User {Email="clihsman.cs@gmail.com", Password="cs14503034" });
                 Contact[]? result = await contactsService.GetContacts();
-                Console.WriteLine(result.Length);
+                Console.WriteLine(result?.Length);
 
             }
             catch (RestException ex)
@@ -96,3 +108,4 @@ namespace OpenRestClient
       
     }
 }
+    */
