@@ -1,10 +1,9 @@
 ﻿using OpenRestController.Enums;
 
-namespace OpenRestClient.Attributes
+namespace OpenRestClient.Attributes;
+
+public class GetMapping : RestMethod
 {
-    public class GetMapping : RestMethod
-    {
-        public GetMapping(string route) : base(route, MethodType.GET) { }
-        public GetMapping() : base(MethodType.GET) { }
-    }
+    public GetMapping(string route) : base(route, MethodType.GET) { }
+    public GetMapping() : base(MethodType.GET) { }
 }

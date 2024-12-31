@@ -1,7 +1,6 @@
-﻿namespace OpenRestClient.Attributes
+﻿namespace OpenRestClient.Attributes;
+
+[AttributeUsage(AttributeTargets.Parameter)]
+public class InBody : InField
 {
-    [AttributeUsage(AttributeTargets.Parameter)]
-    public class InBody : InField
-    {
-    }
 }

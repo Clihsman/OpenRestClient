@@ -55,23 +55,27 @@ namespace OpenRestClient
         public string? Name;
     }
 
+
     [RestController("auth")]
     public interface ILoginService
     {
         [PostMapping("signin")]
         [RestAuthentication(AuthenticationType.JWT, AuthenticationMode.BEARER, "token")]
-        Task Signin([InBody] User user);
+        Task Authenticate([InBody] User user);
+
+        static ILoginService Build() => RestApp.BuildApp<ILoginService>();
     }
     /*
     
     [RestController("whatsapp/contacts")]
     public class ContactService : RestApp
     {
-        public ContactService() : base(typeof(ContactService)) { }
+        public LoginService() : base(typeof(LoginService)) { }
 
-        [GetMapping]
-        public Task<Contact[]?> GetContacts()
-            => Call<Contact[]>(nameof(GetContacts));
+        [PostMapping("signin")]
+        [RestAuthentication(AuthenticationType.JWT, AuthenticationMode.BEARER, "token")]
+        public Task Signin([InBody] User user)
+            => Call(nameof(Signin), user);
     }
     */
     /*
@@ -83,6 +87,43 @@ namespace OpenRestClient
         public Task<Contact[]?> GetContacts();
     }
 
+    public class Specialty
+    {
+        [JsonProperty("id")]
+        public int Id { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+    }
+
+
+    [RestController("parameters")]
+    public class ParametersService : RestApp
+    {
+        public ParametersService() : base(typeof(ParametersService)) { }
+
+        [GetMapping("specialties")]
+        public Task<List<Specialty>?> GetSpecialties()
+            => Call<List<Specialty>>(nameof(GetSpecialties));
+    }
+
+    public class FileFDD
+    {
+        [JsonProperty("id")]
+        public int Id { get; set; }
+    }
+
+    [RestController("upload")]
+    public class UploadFileService : RestApp
+    {
+        public UploadFileService() : base(typeof(UploadFileService)) { }
+
+        [PostMapping]
+        public Task<FileFDD?> UploadFile([InField] string abc, [InQuery] string name, [InQuery] int document)
+            => Call<FileFDD>(nameof(UploadFile), abc, name, document);
+    }
+
+
     class Program
     {
         private readonly static ILoginService loginService = RestApp.BuildApp<ILoginService>();
@@ -91,7 +132,8 @@ namespace OpenRestClient
 
         public static async Task Main()
         {
-            Environment.SetEnvironmentVariable("opendev.openrestclient.host", "https://huemchatbot.com:442/api");
+            Environment.SetEnvironmentVariable("opendev.openrestclient.host", "http://localhost:3000/api");
+            Environment.SetEnvironmentVariable("opendev.openrestclient.debug", "true");
             try
             {
                 await loginService.Signin(new User {Email="clihsman.cs@gmail.com", Password="cs14503034" });
@@ -103,6 +145,7 @@ namespace OpenRestClient
             {
                 Console.WriteLine("{0}: {1}", ex.HttpStatusCode, ex.Message);
             }
+            Console.ReadKey();
         }
 
       
