@@ -5,14 +5,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyVersion>1.0.0.1</AssemblyVersion>
-    <Version>1.5.3</Version>
+    <Version>1.6.4</Version>
     <OutputType>Library</OutputType>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Authors>Clisman Isaac Iscala Salas</Authors>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="OpenInjector" Version="0.0.0.6" />
   </ItemGroup>
 
 </Project>

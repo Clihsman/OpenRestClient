@@ -1,13 +1,19 @@
-﻿using System.Net;
+﻿using Newtonsoft.Json;
+using System.Net;
 
 namespace OpenRestClient.ApiController.Exceptions
 {
-    public class RestException : Exception
+    public class RestException(HttpStatusCode httpStatusCode, string message) : Exception(message)
     {
-        public HttpStatusCode HttpStatusCode;
+        public HttpStatusCode HttpStatusCode = httpStatusCode;
 
-        public RestException(HttpStatusCode httpStatusCode, string message) : base(message) {
-            HttpStatusCode = httpStatusCode;
+        public Dictionary<string, object>? ToDictionary() {
+            return JsonConvert.DeserializeObject<Dictionary<string, object>>(Message);
+        }
+
+        public T? ToObject<T>()
+        {
+            return JsonConvert.DeserializeObject<T>(Message);
         }
     }
 }

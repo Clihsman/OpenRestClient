@@ -5,6 +5,8 @@ VisualStudioVersion = 17.7.34009.444
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenRestClient", "OpenRestClient.csproj", "{CFA74285-5FA8-474B-8822-09289A0B0EAA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Examples", "..\Examples\Examples.csproj", "{ED858EC8-FE9E-47B4-BA52-2B17D3F7A0A0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{CFA74285-5FA8-474B-8822-09289A0B0EAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CFA74285-5FA8-474B-8822-09289A0B0EAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CFA74285-5FA8-474B-8822-09289A0B0EAA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED858EC8-FE9E-47B4-BA52-2B17D3F7A0A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED858EC8-FE9E-47B4-BA52-2B17D3F7A0A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED858EC8-FE9E-47B4-BA52-2B17D3F7A0A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED858EC8-FE9E-47B4-BA52-2B17D3F7A0A0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

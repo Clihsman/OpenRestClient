@@ -12,11 +12,23 @@ namespace OpenRestClient
             RestApp = restApp;
         }
 
-        protected override Task<object?> Invoke(MethodInfo? targetMethod, object?[]? args)
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
-            if (targetMethod is null) throw new Exception();
-            RestReturnType? returnType = targetMethod.GetCustomAttribute<RestReturnType>();   
-            return RestApp!.Call(targetMethod!.Name, returnType is null ? targetMethod.ReturnType : returnType.ReturnType, args!);
+            if (targetMethod is null)
+                throw new Exception("Target method cannot be null.");
+
+            RestReturnType? returnTypeAttribute = targetMethod.GetCustomAttribute<RestReturnType>();
+            Type returnType = returnTypeAttribute?.ReturnType ?? targetMethod.ReturnType;
+
+            if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>))
+            {
+                Type taskResultType = returnType.GetGenericArguments()[0];
+
+                var callMethod = typeof(RestApp).GetMethod("Call", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.MakeGenericMethod(taskResultType);
+                return callMethod?.Invoke(RestApp, [targetMethod.Name, args!]);
+            }
+
+            return RestApp?.CallVoid(targetMethod.Name, args!);
         }
     }
 }
