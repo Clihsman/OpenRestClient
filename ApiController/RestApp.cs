@@ -237,6 +237,18 @@ namespace OpenRestClient
             }
 
 
+            if (methodArgs.MethodType == MethodType.DELETE)
+            {
+                HttpResponseMessage response = await HttpClient.DeleteAsync(url);
+                string json = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, json);
+
+                return JsonConvert.DeserializeObject<T>(json);
+
+            }
+
             if (methodArgs.MethodType == MethodType.GET)
             {
                 HttpResponseMessage response = await HttpClient.GetAsync(url);
@@ -330,12 +342,93 @@ namespace OpenRestClient
             throw new Exception();
         }
 
-        private void CallMiddlewares(HttpResponseMessage httpResponse, HttpRequest httpRequest)
-        { 
-            if(Middlewares is null) return;
-            
-            foreach (var action in Middlewares)
-                action.Invoke(HttpClient, httpResponse, httpRequest);
+        protected internal async Task<object?> Call(string method, Type type, params object[] args)
+        {
+            LoadVariables();
+
+
+            (MethodArgs methodArgs, string url) = GetUrl(method, args);
+
+            using HttpClient client = new();
+
+            foreach (var header in Headers)
+                client.DefaultRequestHeaders.Add(header.Key, header.Value);
+
+            if (methodArgs.MethodType == MethodType.GET)
+            {
+                HttpResponseMessage response = await client.GetAsync(url);
+                string dataResponse = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, dataResponse);
+
+                return JsonConvert.DeserializeObject(dataResponse, type);
+            }
+
+            if (methodArgs.MethodType == MethodType.POST)
+            {
+                string dataRequest = methodArgs.ContainsBody ?
+                    JsonConvert.SerializeObject(args[methodArgs.BodyIndex]) : string.Empty;
+
+                HttpContent? httpContent = methodArgs.ContainsBody ?
+                    new StringContent(dataRequest, Encoding.UTF8, "application/json") : null;
+
+                HttpResponseMessage response = await client.PostAsync(url, httpContent);
+                string dataResponse = await response.Content.ReadAsStringAsync();
+
+                RestAuthentication? restAuthentication = methodArgs.MethodInfo.GetCustomAttribute<RestAuthentication>();
+
+                if (restAuthentication is not null && response.IsSuccessStatusCode)
+                {
+                    LoadRestAuthentication(restAuthentication, dataResponse);
+                }
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, dataResponse);
+
+                return JsonConvert.DeserializeObject(dataResponse, type);
+            }
+
+            if (methodArgs.MethodType == MethodType.PUT)
+            {
+                string dataRequest = JsonConvert.SerializeObject(args[0]);
+                var httpContent = new StringContent(dataRequest, Encoding.UTF8, "application/json");
+                HttpResponseMessage response = await client.PutAsync(url, httpContent);
+                string dataResponse = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, dataRequest);
+
+                return JsonConvert.DeserializeObject(dataResponse, type);
+            }
+
+            if (methodArgs.MethodType == MethodType.PATCH)
+            {
+                string dataRequest = JsonConvert.SerializeObject(args[0]);
+                var httpContent = new StringContent(dataRequest, Encoding.UTF8, "application/json");
+                HttpResponseMessage response = await client.PatchAsync(url, httpContent);
+                string dataResponse = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, dataRequest);
+
+                return JsonConvert.DeserializeObject(dataResponse, type);
+            }
+
+
+            if (methodArgs.MethodType == MethodType.DELETE)
+            {
+                HttpResponseMessage response = await client.DeleteAsync(url);
+                string dataResponse = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, dataResponse);
+
+                return JsonConvert.DeserializeObject(dataResponse, type);
+            }
+
+            throw new Exception();
+
         }
 
         protected async Task<RestResponse<T?>> CallResponse<T>(string method, params object[] args)
@@ -474,7 +567,7 @@ namespace OpenRestClient
 
             throw new Exception();
         }
-
+       
         protected async Task<RestResponse> CallResponse(string method, params object[] args)
         {
             LoadVariables();
@@ -594,6 +687,12 @@ namespace OpenRestClient
             }
 
             throw new Exception();
+        }
+
+        private void CallMiddlewares(HttpResponseMessage httpResponse, HttpRequest httpRequest) {
+            if (Middlewares is null) return;
+            foreach (Middleware middleware in Middlewares)
+                middleware.Invoke(HttpClient, httpResponse, httpRequest);
         }
 
         protected internal async Task CallVoid(string method, params object[] args)
@@ -810,8 +909,8 @@ namespace OpenRestClient
                 MethodArgs url = new();
                 ParameterInfo[] parameters = method.GetParameters();
 
-                Dictionary<int, MethodArgs> urls = new();
-                url.InFields = new();
+                Dictionary<int, MethodArgs> urls = [];
+                url.InFields = [];
                 RestMethod? restMethod = method.GetCustomAttribute<RestMethod>();
 
                 if (restMethod is null) continue;
