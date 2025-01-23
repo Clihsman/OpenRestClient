@@ -167,7 +167,12 @@ namespace OpenRestClient
             return null;
         }
 
+<<<<<<< Updated upstream
         protected internal async Task<T?> Call<T>(string method, params object[] args)
+=======
+
+        protected async Task<T?> Call<T>(string method, params object[] args)
+>>>>>>> Stashed changes
         {
             LoadVariables();
 
@@ -236,7 +241,10 @@ namespace OpenRestClient
 
             }
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
             if (methodArgs.MethodType == MethodType.DELETE)
             {
                 HttpResponseMessage response = await HttpClient.DeleteAsync(url);
@@ -246,6 +254,7 @@ namespace OpenRestClient
                     throw new RestException(response.StatusCode, json);
 
                 return JsonConvert.DeserializeObject<T>(json);
+<<<<<<< Updated upstream
 
             }
 
@@ -425,6 +434,8 @@ namespace OpenRestClient
                     throw new RestException(response.StatusCode, dataResponse);
 
                 return JsonConvert.DeserializeObject(dataResponse, type);
+=======
+>>>>>>> Stashed changes
             }
 
             throw new Exception();
@@ -567,8 +578,13 @@ namespace OpenRestClient
 
             throw new Exception();
         }
+<<<<<<< Updated upstream
        
         protected async Task<RestResponse> CallResponse(string method, params object[] args)
+=======
+
+        internal async Task CallVoid(string method, params object[] args)
+>>>>>>> Stashed changes
         {
             LoadVariables();
 
@@ -593,9 +609,16 @@ namespace OpenRestClient
                 CallMiddlewares(response, httpRequest);
 
                 if (!response.IsSuccessStatusCode)
-                    return new RestResponse(response);
+                    throw new RestException(response.StatusCode, await response.Content.ReadAsStringAsync());
 
+<<<<<<< Updated upstream
                 return new RestResponse(response);
+=======
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, JsonConvert.SerializeObject(form), dataResponse);
+
+                return;
+>>>>>>> Stashed changes
             }
 
             if (methodArgs.MethodType == MethodType.GET)
@@ -607,9 +630,16 @@ namespace OpenRestClient
                 CallMiddlewares(response, httpRequest);
 
                 if (response.IsSuccessStatusCode)
-                    return new RestResponse(response);
+                    throw new RestException(response.StatusCode, await response.Content.ReadAsStringAsync());
 
+<<<<<<< Updated upstream
                 return new RestResponse(response);
+=======
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
+
+                return;
+>>>>>>> Stashed changes
             }
 
             if (methodArgs.MethodType == MethodType.POST)
@@ -630,6 +660,7 @@ namespace OpenRestClient
                     LoadRestAuthentication(restAuthentication, dataResponse);
                 }
 
+<<<<<<< Updated upstream
                 var httpRequest = new HttpRequest(methodArgs.MethodType, url, "application/json", dataRequest);
                 CallMiddlewares(response, httpRequest);
 
@@ -637,6 +668,15 @@ namespace OpenRestClient
                     return new RestResponse(response);
 
                 return new RestResponse(response);
+=======
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, await response.Content.ReadAsStringAsync());
+
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
+                return;
+>>>>>>> Stashed changes
             }
 
             if (methodArgs.MethodType == MethodType.PUT)
@@ -646,6 +686,7 @@ namespace OpenRestClient
                 HttpResponseMessage response = await HttpClient.PutAsync(url, httpContent);
                 string dataResponse = await response.Content.ReadAsStringAsync();
 
+<<<<<<< Updated upstream
                 var httpRequest = new HttpRequest(methodArgs.MethodType, url, "application/json", dataRequest);
                 CallMiddlewares(response, httpRequest);
 
@@ -653,6 +694,15 @@ namespace OpenRestClient
                     return new RestResponse(response);
 
                 return new RestResponse(response);
+=======
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, await response.Content.ReadAsStringAsync());
+
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
+                return;
+>>>>>>> Stashed changes
             }
 
             if (methodArgs.MethodType == MethodType.PATCH)
@@ -662,6 +712,7 @@ namespace OpenRestClient
                 HttpResponseMessage response = await HttpClient.PatchAsync(url, httpContent);
                 string dataResponse = await response.Content.ReadAsStringAsync();
 
+<<<<<<< Updated upstream
                 var httpRequest = new HttpRequest(methodArgs.MethodType, url, "application/json", dataRequest);
                 CallMiddlewares(response, httpRequest);
 
@@ -669,6 +720,15 @@ namespace OpenRestClient
                     return new RestResponse(response);
 
                 return new RestResponse(response);
+=======
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, await response.Content.ReadAsStringAsync());
+
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, dataRequest, dataResponse);
+
+                return;
+>>>>>>> Stashed changes
             }
 
 
@@ -677,6 +737,7 @@ namespace OpenRestClient
                 HttpResponseMessage response = await HttpClient.DeleteAsync(url);
                 string dataResponse = await response.Content.ReadAsStringAsync();
 
+<<<<<<< Updated upstream
                 var httpRequest = new HttpRequest(methodArgs.MethodType, url, null, null);
                 CallMiddlewares(response, httpRequest);
 
@@ -684,6 +745,15 @@ namespace OpenRestClient
                     return new RestResponse(response);
 
                 return new RestResponse(response);
+=======
+                if (!response.IsSuccessStatusCode)
+                    throw new RestException(response.StatusCode, await response.Content.ReadAsStringAsync());
+
+                if (DebugMode)
+                    PrintDEBUG(methodArgs.MethodType, url, string.Empty, dataResponse);
+
+                return;
+>>>>>>> Stashed changes
             }
 
             throw new Exception();
